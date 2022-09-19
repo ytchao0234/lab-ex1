@@ -11,6 +11,9 @@ public:
         int i = 0;
         int j = 0;
         glm::vec3 normal = {0.0f, 0.0f, 1.0f};
+        vector<glm::dvec2> structuralSprings;
+        vector<glm::dvec2> shearSprings;
+        vector<glm::dvec2> flexionSprings;
     };
 private:
     Shader* mShader;
@@ -26,4 +29,8 @@ public:
     void makeVertices();
     void bindVertices();
     void render(const glm::mat4&, const glm::mat4&) const;
+    void setSprings();
+    vector<glm::dvec2> getStructuralSprings(const glm::dvec2&) const;
+    vector<glm::dvec2> getShearSprings(const glm::dvec2&) const;
+    vector<glm::dvec2> getFlexionSprings(const glm::dvec2&) const;
 };

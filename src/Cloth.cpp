@@ -36,6 +36,7 @@ void Cloth::makeVertices()
         }
     }
 
+    this->setSprings();
     this->bindVertices();
 }
 
@@ -70,4 +71,67 @@ void Cloth::render(const glm::mat4& projection, const glm::mat4& view) const
     glBindVertexArray(mVAO[0]);
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     glDrawArrays(GL_QUADS, 0, mVertices.size() / 3);
+}
+
+bool checkValid(glm::dvec2 index) 
+{
+    return index.x >= 0 && index.y >= 0;
+}
+
+vector<glm::dvec2> Cloth::getStructuralSprings(const glm::dvec2& vertex) const
+{
+    vector<glm::dvec2> structuralSprings;
+
+    if(checkValid({vertex.x + 1, vertex.y}))
+        structuralSprings.push_back({vertex.x + 1, vertex.y});
+    if(checkValid({vertex.x - 1, vertex.y}))
+        structuralSprings.push_back({vertex.x - 1, vertex.y});
+    if(checkValid({vertex.x, vertex.y + 1}))
+        structuralSprings.push_back({vertex.x, vertex.y + 1});
+    if(checkValid({vertex.x, vertex.y - 1}))
+        structuralSprings.push_back({vertex.x, vertex.y - 1});
+
+    return structuralSprings;
+}
+
+vector<glm::dvec2> Cloth::getShearSprings(const glm::dvec2& vertex) const
+{
+    vector<glm::dvec2> shearSprings;
+
+    if(checkValid({vertex.x + 1, vertex.y + 1}))
+        shearSprings.push_back({vertex.x + 1, vertex.y + 1});
+    if(checkValid({vertex.x - 1, vertex.y - 1}))
+        shearSprings.push_back({vertex.x - 1, vertex.y - 1});
+
+    return shearSprings;
+}
+
+vector<glm::dvec2> Cloth::getFlexionSprings(const glm::dvec2& vertex) const
+{
+    vector<glm::dvec2> flexionSprings;
+
+    if(checkValid({vertex.x + 2, vertex.y}))
+        flexionSprings.push_back({vertex.x + 2, vertex.y});
+    if(checkValid({vertex.x - 2, vertex.y}))
+        flexionSprings.push_back({vertex.x - 2, vertex.y});
+    if(checkValid({vertex.x, vertex.y + 2}))
+        flexionSprings.push_back({vertex.x, vertex.y + 2});
+    if(checkValid({vertex.x, vertex.y - 2}))
+        flexionSprings.push_back({vertex.x, vertex.y - 2});
+
+    return flexionSprings;
+}
+
+void Cloth::setSprings()
+{
+    glm::dvec2 vertex = {0, 0};
+
+    for(int i = 0; i < (int)mAdjacency.size(); i += 1)
+    {
+        vertex = {mAdjacency[i].i, mAdjacency[i].j};
+
+        mAdjacency[i].structuralSprings = getStructuralSprings(vertex);
+        mAdjacency[i].shearSprings = getShearSprings(vertex);
+        mAdjacency[i].flexionSprings = getFlexionSprings(vertex);
+    }
 }
