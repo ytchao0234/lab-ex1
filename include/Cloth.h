@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <Shader.h>
+#include <Light.h>
 
 class Cloth
 {
@@ -17,6 +18,7 @@ public:
     };
 private:
     Shader* mShader;
+    Light* mLight;
     vector<float> mVertices;
     vector<vertex> mAdjacency;
 
@@ -28,7 +30,7 @@ public:
 
     void makeVertices();
     void bindVertices();
-    void render(const glm::mat4&, const glm::mat4&) const;
+    void render(const glm::mat4&, const glm::mat4&, const glm::vec3&) const;
     void setSprings();
     vector<glm::dvec2> getStructuralSprings(const glm::dvec2&) const;
     vector<glm::dvec2> getShearSprings(const glm::dvec2&) const;

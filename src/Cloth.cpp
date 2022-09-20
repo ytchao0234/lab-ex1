@@ -3,6 +3,7 @@
 Cloth::Cloth()
 {
     mShader = new Shader("src/Shaders/cloth.vert", "src/Shaders/cloth.frag");
+    mLight = new Light();
 }
 
 void Cloth::makeVertices()
@@ -55,7 +56,7 @@ void Cloth::bindVertices()
 }
 
 
-void Cloth::render(const glm::mat4& projection, const glm::mat4& view) const
+void Cloth::render(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& position) const
 {
     mShader->use();
 
@@ -65,6 +66,8 @@ void Cloth::render(const glm::mat4& projection, const glm::mat4& view) const
     glm::mat4 model = glm::mat4(1.0f);
     // model = glm::scale(model, glm::vec3(10.0f, 10.0f, 10.0f));
     mShader->setMatrix4("model", (float*)glm::value_ptr(model));
+
+    mLight->setAttribute(mShader, position);
 
     glDisable(GL_CULL_FACE);
 
