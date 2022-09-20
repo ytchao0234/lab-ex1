@@ -7,31 +7,47 @@
 class Cloth
 {
 public:
+    static const float K;
+    static const float G;
+    struct spring {
+        vector<glm::dvec2> structural;
+        vector<glm::dvec2> shear;
+        vector<glm::dvec2> flexion;
+    };
     struct vertex {
-        int index = 0;
-        int i = 0;
-        int j = 0;
-        glm::vec3 normal = {0.0f, 0.0f, 1.0f};
-        vector<glm::dvec2> structuralSprings;
-        vector<glm::dvec2> shearSprings;
-        vector<glm::dvec2> flexionSprings;
+        glm::dvec2 index;
+        glm::vec3 position;
+        glm::vec3 normal;
+        float mass;
+        float velocity;
+        spring springs;
     };
 private:
     Shader* mShader;
     Light* mLight;
-    vector<float> mVertices;
-    vector<vertex> mAdjacency;
+    float mWidth;
+    float mHeight;
+    float mStep;
+    vector<vertex> mVertices;
+    vector<unsigned int> mIndices;
 
-    unsigned int mVAO[1];
-    unsigned int mVBO[1];
+    unsigned int mVAO;
+    unsigned int mVBO;
+    unsigned int mEBO;
 public:
     Cloth();
     ~Cloth();
 
     void makeVertices();
-    void bindVertices();
+    void makeIndices();
+    void bind();
     void render(const glm::mat4&, const glm::mat4&, const glm::vec3&) const;
     void setSprings();
+
+    // float F_int(const vertex&) const;
+    // float F_gr(const vertex&) const;
+    // float F_vi(const vertex&) const;
+
     vector<glm::dvec2> getStructuralSprings(const glm::dvec2&) const;
     vector<glm::dvec2> getShearSprings(const glm::dvec2&) const;
     vector<glm::dvec2> getFlexionSprings(const glm::dvec2&) const;

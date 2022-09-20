@@ -1,60 +1,69 @@
 #include <Cloth.h>
 
+const float Cloth::K = 2.5f;
+const float Cloth::G = 9.8f;
+
 Cloth::Cloth()
 {
+    mWidth = 50.0f;
+    mHeight = 50.0f;
+    mStep = 5.0f;
     mShader = new Shader("src/Shaders/cloth.vert", "src/Shaders/cloth.frag");
     mLight = new Light();
 }
 
 void Cloth::makeVertices()
 {
-    float width = 50.0f, height = 50.0f;
-    float step = 10.0f;
-    int index = 0, ii = 0, jj = 0;
+    vertex v;
+    int ii = 0, jj = 0;
 
-    for(float i = -width / 2; i < width / 2; i += step, ii += 1)
+    for(float i = -mWidth / 2; i <= mWidth / 2; i += mStep, ii += 1)
     {
-        for(float j = -height / 2; j < height / 2; j += step, jj += 1)
+        for(float j = -mHeight / 2; j <= mHeight / 2; j += mStep, jj += 1)
         {
-            vector<float> square =
-            {
-                i, j, 0.0f,
-                i, j + step, 0.0f,
-                i + step, j + step, 0.0f,
-                i + step, j, 0.0f,
-            };
-
-            vector<vertex> vert =
-            {
-                {index++, ii, jj, },
-                {index++, ii, jj + 1, },
-                {index++, ii + 1, jj + 1, },
-                {index++, ii + 1, jj, },
-            };
-
-            mVertices.insert(mVertices.end(), square.begin(), square.end());
-            mAdjacency.insert(mAdjacency.end(), vert.begin(), vert.end());
+            v.index = {ii, jj};
+            v.position = glm::vec3(i, j, 0.0f);
+            mVertices.push_back(v);
         }
     }
 
-    this->setSprings();
-    this->bindVertices();
+    this->makeIndices();
+    this->bind();
 }
 
-void Cloth::bindVertices()
+void Cloth::makeIndices()
 {
-    glGenVertexArrays(1, mVAO);
-    glBindVertexArray(mVAO[0]);
+    int rows = mHeight / mStep + 1;
+    int columns = mWidth / mStep + 1;
 
-    glGenBuffers(1, mVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, mVBO[0]);
-
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * mVertices.size(), mVertices.data(), GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
+    for(unsigned int i = 0; i < mVertices.size(); i += 1)
+    {
+        if(i % rows + 1 >= rows || i / rows + 1 >= columns)
+            continue;
+        mIndices.push_back(i);
+        mIndices.push_back(i + rows);
+        mIndices.push_back(i + rows + 1);
+        mIndices.push_back(i + 1);
+    }
 }
 
+void Cloth::bind()
+{
+    glGenVertexArrays(1, &mVAO);
+    glBindVertexArray(mVAO);
+
+    glGenBuffers(1, &mVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, mVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex) * mVertices.size(), mVertices.data(), GL_STATIC_DRAW);
+
+    glGenBuffers(1, &mEBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mIndices.size() * sizeof(unsigned int), mIndices.data(), GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)offsetof(vertex, position));
+    glBindVertexArray(0);
+}
 
 void Cloth::render(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& position) const
 {
@@ -71,9 +80,9 @@ void Cloth::render(const glm::mat4& projection, const glm::mat4& view, const glm
 
     glDisable(GL_CULL_FACE);
 
-    glBindVertexArray(mVAO[0]);
+    glBindVertexArray(mVAO);
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glDrawArrays(GL_QUADS, 0, mVertices.size() / 3);
+    glDrawElements(GL_QUADS, static_cast<unsigned int>(mIndices.size()), GL_UNSIGNED_INT, 0);
 }
 
 bool checkValid(glm::dvec2 index) 
@@ -127,14 +136,43 @@ vector<glm::dvec2> Cloth::getFlexionSprings(const glm::dvec2& vertex) const
 
 void Cloth::setSprings()
 {
-    glm::dvec2 vertex = {0, 0};
-
-    for(int i = 0; i < (int)mAdjacency.size(); i += 1)
+    for(int i = 0; i < (int)mVertices.size(); i += 1)
     {
-        vertex = {mAdjacency[i].i, mAdjacency[i].j};
-
-        mAdjacency[i].structuralSprings = getStructuralSprings(vertex);
-        mAdjacency[i].shearSprings = getShearSprings(vertex);
-        mAdjacency[i].flexionSprings = getFlexionSprings(vertex);
+        mVertices[i].springs.structural = getStructuralSprings(mVertices[i].index);
+        mVertices[i].springs.shear = getShearSprings(mVertices[i].index);
+        mVertices[i].springs.flexion = getFlexionSprings(mVertices[i].index);
     }
 }
+
+// float Cloth::F_int(const vertex& Pij) const
+// {
+//     int i = 0;
+//     glm::vec3 Pkl = {0.0f, 0.0f, 0.0f};
+
+//     for(i = 0; i < (int)Pij.structuralSprings.size(); i += 1)
+//     {
+//     }
+
+//     for(i = 0; i < (int)Pij.shearSprings.size(); i += 1)
+//     {
+        
+//     }
+
+//     for(i = 0; i < (int)Pij.flexionSprings.size(); i += 1)
+//     {
+        
+//     }
+
+//     return 0;
+// }
+
+// float Cloth::F_gr(const vertex& Pij) const
+// {
+//     return 0;
+// }
+
+// float Cloth::F_vi(const vertex& Pij) const
+// {
+//     return 0;
+
+// }
