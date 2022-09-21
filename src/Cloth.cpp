@@ -8,6 +8,9 @@ Cloth::Cloth()
     mWidth = 50.0f;
     mHeight = 50.0f;
     mStep = 5.0f;
+    mRows = mHeight / mStep + 1;
+    mColumns = mWidth / mStep + 1;
+
     mShader = new Shader("src/Shaders/cloth.vert", "src/Shaders/cloth.frag");
     mLight = new Light();
 }
@@ -15,35 +18,35 @@ Cloth::Cloth()
 void Cloth::makeVertices()
 {
     vertex v;
-    int ii = 0, jj = 0;
 
-    for(float i = -mWidth / 2; i <= mWidth / 2; i += mStep, ii += 1)
+    for(float i = -mWidth / 2; i <= mWidth / 2; i += mStep)
     {
-        for(float j = -mHeight / 2; j <= mHeight / 2; j += mStep, jj += 1)
+        for(float j = -mHeight / 2; j <= mHeight / 2; j += mStep)
         {
-            v.index = {ii, jj};
             v.position = glm::vec3(i, j, 0.0f);
             mVertices.push_back(v);
         }
     }
-
+    
+    this->setSprings();
     this->makeIndices();
     this->bind();
 }
 
 void Cloth::makeIndices()
 {
-    int rows = mHeight / mStep + 1;
-    int columns = mWidth / mStep + 1;
+    unsigned int right, topRight, top;
 
     for(unsigned int i = 0; i < mVertices.size(); i += 1)
     {
-        if(i % rows + 1 >= rows || i / rows + 1 >= columns)
+        if(i % mRows + 1 >= mRows || i / mRows + 1 >= mColumns)
             continue;
-        mIndices.push_back(i);
-        mIndices.push_back(i + rows);
-        mIndices.push_back(i + rows + 1);
-        mIndices.push_back(i + 1);
+
+        right = this->getIndex(i, Direction::RIGHT);
+        topRight = this->getIndex(right, Direction::TOP);
+        top = this->getIndex(i, Direction::TOP);
+
+        mIndices.insert(mIndices.end(), {i, right, topRight, top});
     }
 }
 
@@ -85,63 +88,85 @@ void Cloth::render(const glm::mat4& projection, const glm::mat4& view, const glm
     glDrawElements(GL_QUADS, static_cast<unsigned int>(mIndices.size()), GL_UNSIGNED_INT, 0);
 }
 
-bool checkValid(glm::dvec2 index) 
+bool Cloth::isValidIndex(const int& index, const Direction& direction) const
 {
-    return index.x >= 0 && index.y >= 0;
+    if(index < 0 || index >= mRows * mColumns)
+        return false;
+    if(direction == Direction::TOP && index % mRows == 0)
+        return false;
+    if(direction == Direction::BOTTOM && index % mRows == mRows - 1)
+        return false;
+
+    return true;
 }
 
-vector<glm::dvec2> Cloth::getStructuralSprings(const glm::dvec2& vertex) const
+int Cloth::getIndex(const unsigned int& index, const Direction& direction) const
 {
-    vector<glm::dvec2> structuralSprings;
-
-    if(checkValid({vertex.x + 1, vertex.y}))
-        structuralSprings.push_back({vertex.x + 1, vertex.y});
-    if(checkValid({vertex.x - 1, vertex.y}))
-        structuralSprings.push_back({vertex.x - 1, vertex.y});
-    if(checkValid({vertex.x, vertex.y + 1}))
-        structuralSprings.push_back({vertex.x, vertex.y + 1});
-    if(checkValid({vertex.x, vertex.y - 1}))
-        structuralSprings.push_back({vertex.x, vertex.y - 1});
-
-    return structuralSprings;
-}
-
-vector<glm::dvec2> Cloth::getShearSprings(const glm::dvec2& vertex) const
-{
-    vector<glm::dvec2> shearSprings;
-
-    if(checkValid({vertex.x + 1, vertex.y + 1}))
-        shearSprings.push_back({vertex.x + 1, vertex.y + 1});
-    if(checkValid({vertex.x - 1, vertex.y - 1}))
-        shearSprings.push_back({vertex.x - 1, vertex.y - 1});
-
-    return shearSprings;
-}
-
-vector<glm::dvec2> Cloth::getFlexionSprings(const glm::dvec2& vertex) const
-{
-    vector<glm::dvec2> flexionSprings;
-
-    if(checkValid({vertex.x + 2, vertex.y}))
-        flexionSprings.push_back({vertex.x + 2, vertex.y});
-    if(checkValid({vertex.x - 2, vertex.y}))
-        flexionSprings.push_back({vertex.x - 2, vertex.y});
-    if(checkValid({vertex.x, vertex.y + 2}))
-        flexionSprings.push_back({vertex.x, vertex.y + 2});
-    if(checkValid({vertex.x, vertex.y - 2}))
-        flexionSprings.push_back({vertex.x, vertex.y - 2});
-
-    return flexionSprings;
+    switch(direction)
+    {
+        case TOP:
+            return (int)index + 1;
+        case BOTTOM:
+            return (int)index - 1;
+        case LEFT:
+            return (int)index - mRows;
+        case RIGHT:
+            return (int)index + mRows;
+    }
 }
 
 void Cloth::setSprings()
 {
     for(int i = 0; i < (int)mVertices.size(); i += 1)
     {
-        mVertices[i].springs.structural = getStructuralSprings(mVertices[i].index);
-        mVertices[i].springs.shear = getShearSprings(mVertices[i].index);
-        mVertices[i].springs.flexion = getFlexionSprings(mVertices[i].index);
+        setStructuralAndFlexionSprings(i);
+        setShearSprings(i);
     }
+}
+
+void Cloth::setOneDirect_SF(unsigned int index, const Direction& direct)
+{
+    int target = this->getIndex(index, direct);
+
+    if(this->isValidIndex(target, direct))
+    {
+        mVertices[index].springs.structural.push_back(target);
+        target = this->getIndex(target, direct);
+
+        if(this->isValidIndex(target, direct))
+            mVertices[index].springs.flexion.push_back(target);
+    }
+}
+
+void Cloth::setOneDirect_SH(unsigned int index, const Direction& direct)
+{
+    int target, targetLeft, targetRight;
+    target    = getIndex(index, direct);
+
+    if(isValidIndex(target, direct))
+    {
+        targetLeft  = getIndex(target, Direction::LEFT);
+        targetRight = getIndex(target, Direction::RIGHT);
+
+        if(isValidIndex(targetLeft, Direction::LEFT))
+            mVertices[index].springs.shear.push_back(targetLeft);
+        if(isValidIndex(targetRight, Direction::RIGHT))
+            mVertices[index].springs.shear.push_back(targetRight);
+    }
+}
+
+void Cloth::setStructuralAndFlexionSprings(const unsigned int& index)
+{
+    this->setOneDirect_SF(index, Direction::TOP);
+    this->setOneDirect_SF(index, Direction::BOTTOM);
+    this->setOneDirect_SF(index, Direction::LEFT);
+    this->setOneDirect_SF(index, Direction::RIGHT);
+}
+
+void Cloth::setShearSprings(const unsigned int& index)
+{
+    setOneDirect_SH(index, Direction::TOP);
+    setOneDirect_SH(index, Direction::BOTTOM);
 }
 
 // float Cloth::F_int(const vertex& Pij) const

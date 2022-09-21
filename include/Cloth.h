@@ -10,17 +10,19 @@ public:
     static const float K;
     static const float G;
     struct spring {
-        vector<glm::dvec2> structural;
-        vector<glm::dvec2> shear;
-        vector<glm::dvec2> flexion;
+        vector<unsigned int> structural;
+        vector<unsigned int> shear;
+        vector<unsigned int> flexion;
     };
     struct vertex {
-        glm::dvec2 index;
         glm::vec3 position;
         glm::vec3 normal;
         float mass;
         float velocity;
         spring springs;
+    };
+    enum Direction {
+        TOP, BOTTOM, LEFT, RIGHT
     };
 private:
     Shader* mShader;
@@ -28,6 +30,8 @@ private:
     float mWidth;
     float mHeight;
     float mStep;
+    int mRows;
+    int mColumns;
     vector<vertex> mVertices;
     vector<unsigned int> mIndices;
 
@@ -42,13 +46,18 @@ public:
     void makeIndices();
     void bind();
     void render(const glm::mat4&, const glm::mat4&, const glm::vec3&) const;
+
+    bool isValidIndex(const int&, const Direction&) const;
+    int getIndex(const unsigned int&, const Direction&) const;
+
     void setSprings();
+    void setOneDirect_SF(unsigned int, const Direction&);
+    void setOneDirect_SH(unsigned int, const Direction&);
+    void setStructuralAndFlexionSprings(const unsigned int&);
+    void setShearSprings(const unsigned int&);
 
     // float F_int(const vertex&) const;
     // float F_gr(const vertex&) const;
     // float F_vi(const vertex&) const;
 
-    vector<glm::dvec2> getStructuralSprings(const glm::dvec2&) const;
-    vector<glm::dvec2> getShearSprings(const glm::dvec2&) const;
-    vector<glm::dvec2> getFlexionSprings(const glm::dvec2&) const;
 };
