@@ -23,8 +23,8 @@ int main()
         //     wm.getCloth()->bind();
         // }
         // first = false; 
-            wm.getCloth()->move();
-            wm.getCloth()->bind();
+        wm.getCloth()->move();
+        wm.getCloth()->bind();
         wm.getCloth()->render(wm.getCamera()->getProjection(wm.getWidth(), wm.getHeight()), wm.getCamera()->getView(), wm.getCamera()->getPosition());
 
         glfwPollEvents();

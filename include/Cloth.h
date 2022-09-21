@@ -49,6 +49,7 @@ public:
     void bind();
     void render(const glm::mat4&, const glm::mat4&, const glm::vec3&) const;
 
+    glm::vec3 setNormal();
     bool isValidIndex(const int&, const Direction&) const;
     int getIndex(const unsigned int&, const Direction&) const;
 

@@ -5,9 +5,9 @@ const float Cloth::G = 9.8f;
 
 Cloth::Cloth()
 {
-    mWidth = 50.0f;
-    mHeight = 50.0f;
-    mStep = 5.0f;
+    mWidth = 500.0f;
+    mHeight = 500.0f;
+    mStep = 50.0f;
     mRows = mHeight / mStep + 1;
     mColumns = mWidth / mStep + 1;
 
@@ -54,17 +54,21 @@ void Cloth::move()
 {
     glm::vec3 force = {0.0f, 0.0f, 0.0f};
     glm::vec3 acceleration = {0.0f, 0.0f, 0.0f};
+    glm::vec3 fint = {0.0f, 0.0f, 0.0f};
 
     for(int i = 0; i < (int)mVertices.size(); i += 1)
     {
         if(i == mRows - 1 || i == mRows * mColumns - 1)
             continue;
 
+        fint += F_int(mVertices[i]);
         force = F_int(mVertices[i]) + F_gr(mVertices[i]) + F_vi(mVertices[i]);
         acceleration = force / mVertices[i].mass;
-        mVertices[i].velocity += 0.003f * acceleration;
-        mVertices[i].position += 0.003f * mVertices[i].velocity;
+        mVertices[i].velocity += 0.01f * acceleration;
+        mVertices[i].position += 0.01f * mVertices[i].velocity;
     }
+
+    cout << "fint: " << fint.x << ", " << fint.y << ", " << fint.z << endl;
 }
 
 void Cloth::bind()
@@ -232,9 +236,15 @@ glm::vec3 Cloth::F_int_single(const Vertex& Pij, const Spring& spring) const
 {
     Vertex Pkl = mVertices[spring.index];
     glm::vec3 l_ijkl = Pkl.position - Pij.position;
-    glm::vec3 naturalSpring = spring.naturalLength * glm::normalize(l_ijkl);;
-    glm::vec3 delta_x = l_ijkl - naturalSpring;
+    glm::vec3 delta_x = l_ijkl - spring.naturalLength * glm::normalize(l_ijkl);
     glm::vec3 result = -Cloth::K * delta_x;
+
+    if(spring.index == mRows * 2 - 1)
+        cout << "length 1: " << glm::length(l_ijkl) << endl;
+    if(spring.index == mRows * 2 - 1)
+        cout << "length 0: " << spring.naturalLength << endl;
+    if(spring.index == mRows * 2 - 1)
+        cout << "length 2: " << glm::length(delta_x) << endl;
 }
 
 glm::vec3 Cloth::F_gr(const Vertex& Pij) const
@@ -245,7 +255,6 @@ glm::vec3 Cloth::F_gr(const Vertex& Pij) const
 glm::vec3 Cloth::F_vi(const Vertex& Pij) const
 {
     glm::vec3 result = {0.0f, 0.0f, 0.0f};
-
 
     return result;
 }
