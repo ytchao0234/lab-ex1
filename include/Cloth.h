@@ -9,17 +9,18 @@ class Cloth
 public:
     static const float K;
     static const float G;
-    struct spring {
-        vector<unsigned int> structural;
-        vector<unsigned int> shear;
-        vector<unsigned int> flexion;
+    struct Spring {
+        unsigned int index;
+        float naturalLength;
     };
-    struct vertex {
+    struct Vertex {
         glm::vec3 position;
         glm::vec3 normal;
-        float mass;
-        float velocity;
-        spring springs;
+        float mass = 1.0f;
+        glm::vec3 velocity = {0.0f, 0.0f, 0.0f};
+        vector<Spring> structural;
+        vector<Spring> shear;
+        vector<Spring> flexion;
     };
     enum Direction {
         TOP, BOTTOM, LEFT, RIGHT
@@ -32,7 +33,7 @@ private:
     float mStep;
     int mRows;
     int mColumns;
-    vector<vertex> mVertices;
+    vector<Vertex> mVertices;
     vector<unsigned int> mIndices;
 
     unsigned int mVAO;
@@ -44,6 +45,7 @@ public:
 
     void makeVertices();
     void makeIndices();
+    void move();
     void bind();
     void render(const glm::mat4&, const glm::mat4&, const glm::vec3&) const;
 
@@ -51,13 +53,13 @@ public:
     int getIndex(const unsigned int&, const Direction&) const;
 
     void setSprings();
-    void setOneDirect_SF(unsigned int, const Direction&);
-    void setOneDirect_SH(unsigned int, const Direction&);
     void setStructuralAndFlexionSprings(const unsigned int&);
     void setShearSprings(const unsigned int&);
+    void setOneDirect_SF(unsigned int, const Direction&);
+    void setOneDirect_SH(unsigned int, const Direction&);
 
-    // float F_int(const vertex&) const;
-    // float F_gr(const vertex&) const;
-    // float F_vi(const vertex&) const;
-
+    glm::vec3 F_int(const Vertex&) const;
+    glm::vec3 F_int_single(const Vertex&, const Spring&) const;
+    glm::vec3 F_gr(const Vertex&) const;
+    glm::vec3 F_vi(const Vertex&) const;
 };

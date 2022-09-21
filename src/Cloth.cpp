@@ -17,7 +17,7 @@ Cloth::Cloth()
 
 void Cloth::makeVertices()
 {
-    vertex v;
+    Vertex v;
 
     for(float i = -mWidth / 2; i <= mWidth / 2; i += mStep)
     {
@@ -50,6 +50,23 @@ void Cloth::makeIndices()
     }
 }
 
+void Cloth::move()
+{
+    glm::vec3 force = {0.0f, 0.0f, 0.0f};
+    glm::vec3 acceleration = {0.0f, 0.0f, 0.0f};
+
+    for(int i = 0; i < (int)mVertices.size(); i += 1)
+    {
+        if(i == mRows - 1 || i == mRows * mColumns - 1)
+            continue;
+
+        force = F_int(mVertices[i]) + F_gr(mVertices[i]) + F_vi(mVertices[i]);
+        acceleration = force / mVertices[i].mass;
+        mVertices[i].velocity += 0.003f * acceleration;
+        mVertices[i].position += 0.003f * mVertices[i].velocity;
+    }
+}
+
 void Cloth::bind()
 {
     glGenVertexArrays(1, &mVAO);
@@ -57,14 +74,14 @@ void Cloth::bind()
 
     glGenBuffers(1, &mVBO);
     glBindBuffer(GL_ARRAY_BUFFER, mVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex) * mVertices.size(), mVertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * mVertices.size(), mVertices.data(), GL_STATIC_DRAW);
 
     glGenBuffers(1, &mEBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, mIndices.size() * sizeof(unsigned int), mIndices.data(), GL_STATIC_DRAW);
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex), (void*)offsetof(vertex, position));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
     glBindVertexArray(0);
 }
 
@@ -124,37 +141,6 @@ void Cloth::setSprings()
     }
 }
 
-void Cloth::setOneDirect_SF(unsigned int index, const Direction& direct)
-{
-    int target = this->getIndex(index, direct);
-
-    if(this->isValidIndex(target, direct))
-    {
-        mVertices[index].springs.structural.push_back(target);
-        target = this->getIndex(target, direct);
-
-        if(this->isValidIndex(target, direct))
-            mVertices[index].springs.flexion.push_back(target);
-    }
-}
-
-void Cloth::setOneDirect_SH(unsigned int index, const Direction& direct)
-{
-    int target, targetLeft, targetRight;
-    target    = getIndex(index, direct);
-
-    if(isValidIndex(target, direct))
-    {
-        targetLeft  = getIndex(target, Direction::LEFT);
-        targetRight = getIndex(target, Direction::RIGHT);
-
-        if(isValidIndex(targetLeft, Direction::LEFT))
-            mVertices[index].springs.shear.push_back(targetLeft);
-        if(isValidIndex(targetRight, Direction::RIGHT))
-            mVertices[index].springs.shear.push_back(targetRight);
-    }
-}
-
 void Cloth::setStructuralAndFlexionSprings(const unsigned int& index)
 {
     this->setOneDirect_SF(index, Direction::TOP);
@@ -169,35 +155,97 @@ void Cloth::setShearSprings(const unsigned int& index)
     setOneDirect_SH(index, Direction::BOTTOM);
 }
 
-// float Cloth::F_int(const vertex& Pij) const
-// {
-//     int i = 0;
-//     glm::vec3 Pkl = {0.0f, 0.0f, 0.0f};
+void Cloth::setOneDirect_SF(unsigned int index, const Direction& direct)
+{
+    glm::vec3 Pij = mVertices[index].position;
+    glm::vec3 Pkl;
 
-//     for(i = 0; i < (int)Pij.structuralSprings.size(); i += 1)
-//     {
-//     }
+    Spring target;
+    target.index = this->getIndex(index, direct);
 
-//     for(i = 0; i < (int)Pij.shearSprings.size(); i += 1)
-//     {
-        
-//     }
+    if(this->isValidIndex(target.index, direct))
+    {
+        Pkl = mVertices[target.index].position;
+        target.naturalLength = glm::distance(Pij, Pkl);
+        mVertices[index].structural.push_back(target);
 
-//     for(i = 0; i < (int)Pij.flexionSprings.size(); i += 1)
-//     {
-        
-//     }
+        target.index = this->getIndex(target.index, direct);
 
-//     return 0;
-// }
+        if(this->isValidIndex(target.index, direct))
+        {
+            Pkl = mVertices[target.index].position;
+            target.naturalLength = glm::distance(Pij, Pkl);
+            mVertices[index].flexion.push_back(target);
+        }
+    }
+}
 
-// float Cloth::F_gr(const vertex& Pij) const
-// {
-//     return 0;
-// }
+void Cloth::setOneDirect_SH(unsigned int index, const Direction& direct)
+{
+    glm::vec3 Pij = mVertices[index].position;
+    glm::vec3 Pkl;
+    Spring target, targetLeft, targetRight;
+    target.index = this->getIndex(index, direct);
 
-// float Cloth::F_vi(const vertex& Pij) const
-// {
-//     return 0;
+    if(isValidIndex(target.index, direct))
+    {
+        targetLeft.index  = getIndex(target.index, Direction::LEFT);
+        targetRight.index = getIndex(target.index, Direction::RIGHT);
 
-// }
+        if(isValidIndex(targetLeft.index, Direction::LEFT))
+        {
+            Pkl = mVertices[targetLeft.index].position;
+            targetLeft.naturalLength = glm::distance(Pij, Pkl);
+            mVertices[index].shear.push_back(targetLeft);
+        }
+        if(isValidIndex(targetRight.index, Direction::RIGHT))
+        {
+            Pkl = mVertices[targetRight.index].position;
+            targetRight.naturalLength = glm::distance(Pij, Pkl);
+            mVertices[index].shear.push_back(targetRight);
+        }
+    }
+}
+
+glm::vec3 Cloth::F_int(const Vertex& Pij) const
+{
+    int i = 0;
+    glm::vec3 result = {0.0f, 0.0f, 0.0f};
+
+    for(i = 0; i < (int)Pij.structural.size(); i += 1)
+    {
+        result += F_int_single(Pij, Pij.structural[i]);
+    }
+    for(i = 0; i < (int)Pij.shear.size(); i += 1)
+    {
+        result += F_int_single(Pij, Pij.shear[i]);
+    }
+    for(i = 0; i < (int)Pij.flexion.size(); i += 1)
+    {
+        result += F_int_single(Pij, Pij.flexion[i]);
+    }    
+
+    return result;
+}
+
+glm::vec3 Cloth::F_int_single(const Vertex& Pij, const Spring& spring) const
+{
+    Vertex Pkl = mVertices[spring.index];
+    glm::vec3 l_ijkl = Pkl.position - Pij.position;
+    glm::vec3 naturalSpring = spring.naturalLength * glm::normalize(l_ijkl);;
+    glm::vec3 delta_x = l_ijkl - naturalSpring;
+    glm::vec3 result = -Cloth::K * delta_x;
+}
+
+glm::vec3 Cloth::F_gr(const Vertex& Pij) const
+{
+    return glm::vec3(0.0f, - Pij.mass * Cloth::G, 0.0f);
+}
+
+glm::vec3 Cloth::F_vi(const Vertex& Pij) const
+{
+    glm::vec3 result = {0.0f, 0.0f, 0.0f};
+
+
+    return result;
+}
