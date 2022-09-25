@@ -1,13 +1,14 @@
 #include <Cloth.h>
 
 const float Cloth::K = 2.5f;
+const float Cloth::C = 0.5f;
 const float Cloth::G = 9.8f;
 
 Cloth::Cloth()
 {
-    mWidth = 500.0f;
-    mHeight = 500.0f;
-    mStep = 50.0f;
+    mWidth = 50.0f;
+    mHeight = 50.0f;
+    mStep = 10.0f;
     mRows = mHeight / mStep + 1;
     mColumns = mWidth / mStep + 1;
 
@@ -27,9 +28,14 @@ void Cloth::makeVertices()
             mVertices.push_back(v);
         }
     }
-    
-    this->setSprings();
+
+    mVertices[mRows - 1].fixed = true;
+    mVertices[mRows * mColumns - 1].fixed = true;
+
     this->makeIndices();
+    this->setFaceList();
+    this->setNormal();
+    this->setSprings();
     this->bind();
 }
 
@@ -46,29 +52,73 @@ void Cloth::makeIndices()
         topRight = this->getIndex(right, Direction::TOP);
         top = this->getIndex(i, Direction::TOP);
 
-        mIndices.insert(mIndices.end(), {i, right, topRight, top});
+        mIndices.insert(mIndices.end(), {i, right, topRight});
+        mIndices.insert(mIndices.end(), {topRight, top, i});
     }
 }
 
-void Cloth::move()
+void Cloth::setFaceList()
+{
+    int i = 0, j = 0, v = 0, f = 0;
+    Face face;
+
+    for(i = 0; i < (int)mIndices.size(); i += 1)
+    {
+        v = mIndices[i];
+        f = j - j % 3;
+        face.vertices = {mIndices[f], mIndices[f + 1], mIndices[f + 2]};
+        mVertices[v].adjacentFaces.push_back(face);
+    }
+}
+
+void Cloth::setNormal()
+{
+    glm::vec3 sumOfNormal = {0.0f, 0.0f, 0.0f};
+
+    for(auto& vertex: mVertices)
+    {
+        for(auto& face: vertex.adjacentFaces)
+        {
+            face.normal = calcuNormal(face.vertices);
+            sumOfNormal += face.normal;
+        }
+        vertex.normal = glm::normalize(sumOfNormal);
+    }
+}
+
+glm::vec3 Cloth::calcuNormal(glm::dvec3 vertices)
+{
+    glm::vec3 p0 = mVertices[vertices.x].position;
+    glm::vec3 p1 = mVertices[vertices.y].position;
+    glm::vec3 p2 = mVertices[vertices.z].position;
+
+    glm::vec3 v0 = p1 - p0;
+    glm::vec3 v1 = p2 - p1;
+
+    glm::vec3 cross = glm::cross(v0, v1);
+    glm::vec3 normal = glm::normalize(cross);
+
+    return normal;
+}
+
+void Cloth::update()
 {
     glm::vec3 force = {0.0f, 0.0f, 0.0f};
     glm::vec3 acceleration = {0.0f, 0.0f, 0.0f};
-    glm::vec3 fint = {0.0f, 0.0f, 0.0f};
+    float delta_t = 0.02f;
 
     for(int i = 0; i < (int)mVertices.size(); i += 1)
     {
-        if(i == mRows - 1 || i == mRows * mColumns - 1)
+        if(mVertices[i].fixed)
             continue;
 
-        fint += F_int(mVertices[i]);
-        force = F_int(mVertices[i]) + F_gr(mVertices[i]) + F_vi(mVertices[i]);
         acceleration = force / mVertices[i].mass;
-        mVertices[i].velocity += 0.01f * acceleration;
-        mVertices[i].position += 0.01f * mVertices[i].velocity;
+        mVertices[i].velocity += delta_t * acceleration;
+        mVertices[i].position += delta_t * mVertices[i].velocity;
+        this->setNormal();
     }
 
-    cout << "fint: " << fint.x << ", " << fint.y << ", " << fint.z << endl;
+    this->bind();
 }
 
 void Cloth::bind()
@@ -86,6 +136,8 @@ void Cloth::bind()
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
     glBindVertexArray(0);
 }
 
@@ -105,8 +157,8 @@ void Cloth::render(const glm::mat4& projection, const glm::mat4& view, const glm
     glDisable(GL_CULL_FACE);
 
     glBindVertexArray(mVAO);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glDrawElements(GL_QUADS, static_cast<unsigned int>(mIndices.size()), GL_UNSIGNED_INT, 0);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_TRIANGLES);
+    glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(mIndices.size()), GL_UNSIGNED_INT, 0);
 }
 
 bool Cloth::isValidIndex(const int& index, const Direction& direction) const
@@ -227,7 +279,7 @@ glm::vec3 Cloth::F_int(const Vertex& Pij) const
     for(i = 0; i < (int)Pij.flexion.size(); i += 1)
     {
         result += F_int_single(Pij, Pij.flexion[i]);
-    }    
+    }  
 
     return result;
 }
@@ -237,24 +289,21 @@ glm::vec3 Cloth::F_int_single(const Vertex& Pij, const Spring& spring) const
     Vertex Pkl = mVertices[spring.index];
     glm::vec3 l_ijkl = Pkl.position - Pij.position;
     glm::vec3 delta_x = l_ijkl - spring.naturalLength * glm::normalize(l_ijkl);
-    glm::vec3 result = -Cloth::K * delta_x;
+    glm::vec3 result = Cloth::K * delta_x;
 
-    if(spring.index == mRows * 2 - 1)
-        cout << "length 1: " << glm::length(l_ijkl) << endl;
-    if(spring.index == mRows * 2 - 1)
-        cout << "length 0: " << spring.naturalLength << endl;
-    if(spring.index == mRows * 2 - 1)
-        cout << "length 2: " << glm::length(delta_x) << endl;
+    return result;
 }
 
 glm::vec3 Cloth::F_gr(const Vertex& Pij) const
 {
-    return glm::vec3(0.0f, - Pij.mass * Cloth::G, 0.0f);
+    glm::vec3 result = glm::vec3(0.0f, - Pij.mass * Cloth::G, 0.0f);
+
+    return result;
 }
 
 glm::vec3 Cloth::F_vi(const Vertex& Pij) const
 {
-    glm::vec3 result = {0.0f, 0.0f, 0.0f};
+    glm::vec3 result = -Cloth::C * Pij.velocity;
 
     return result;
 }

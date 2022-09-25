@@ -16,15 +16,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         wm.drawSample();
-        // static bool first = true;
-        // if(first)
-        // {
-        //     wm.getCloth()->move();
-        //     wm.getCloth()->bind();
-        // }
-        // first = false; 
-        wm.getCloth()->move();
-        wm.getCloth()->bind();
+        wm.getCloth()->update();
         wm.getCloth()->render(wm.getCamera()->getProjection(wm.getWidth(), wm.getHeight()), wm.getCamera()->getView(), wm.getCamera()->getPosition());
 
         glfwPollEvents();

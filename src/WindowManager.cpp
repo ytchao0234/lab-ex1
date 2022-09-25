@@ -66,7 +66,7 @@ void WindowManager::initCallbacks()
 
 void WindowManager::initObjects()
 {
-    mCamera = new Camera(glm::vec3(0.0f, 0.0f, -10.0f), 90.0f, 0.0f);
+    mCamera = new Camera(glm::vec3(0.0f, 0.0f, 10.0f), -90.0f, 0.0f);
     mShader = new Shader("src/Shaders/sample.vert", "src/Shaders/sample.frag");
     mCloth = new Cloth();
     mCloth->makeVertices();
